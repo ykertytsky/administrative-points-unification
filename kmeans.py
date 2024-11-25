@@ -1,47 +1,111 @@
-from sklearn.metrics import pairwise_distances
+'''
+K MEANS
+'''
+
+import pandas as pd
 import numpy as np
 
-
-def kmeans(adj_matrix, nodes, n_clusters):
+def read_distance_data(file_path):
     """
-    Реалізація алгоритму K-Means для кластеризації.
-
-    Параметри:
-    adj_matrix (numpy.ndarray): Матриця суміжності.
-    nodes (list): Список вузлів.
-    n_clusters (int): Кількість кластерів.
-
-    Повертає:
-    dict: Мапа кластерів та відповідних вузлів.
+    Зчитує дані з CSV-файлу у форматі, потрібному для програми.
+    
+    Args:
+        file_path (str): Шлях до CSV-файлу.
+    
+    Returns:
+        pd.DataFrame: DataFrame з даними про відстані.
     """
-    # Ініціалізація кластерних центрів
-    n_samples = adj_matrix.shape[0]
-    centroids = adj_matrix[np.random.choice(n_samples, n_clusters, replace=False)]
+    try:
+        df = pd.read_csv(file_path)
 
-    prev_labels = None
+        # Перевірка наявності потрібних стовпців
+        required_columns = {'Назва міста1', 'Назва міста2', 'Відстань (км)'}
+        if not required_columns.issubset(df.columns):
+            raise ValueError(f"CSV файл повинен містити такі стовпці: {', '.join(required_columns)}")
+
+        # Перевірка на відсутність порожніх значень
+        if df.isnull().any().any():
+            raise ValueError("CSV файл містить порожні значення. Перевірте дані.")
+
+        # Перетворення типу стовпця 'Відстань (км)' на числовий
+        df['Відстань (км)'] = pd.to_numeric(df['Відстань (км)'], errors='coerce')
+        if df['Відстань (км)'].isnull().any():
+            raise ValueError("Стовпець 'Відстань (км)' повинен містити лише числові значення.")
+
+        print("Дані успішно зчитано!")
+        return df
+
+    except FileNotFoundError:
+        print(f"Помилка: Файл за адресою '{file_path}' не знайдено.")
+    except ValueError as e:
+        print(f"Помилка у даних: {e}")
+    except Exception as e:
+        print(f"Невідома помилка: {e}")
+
+def create_distance_matrix(df):
+    # Отримуємо унікальні міста
+    cities = list(set(df['Назва міста1'].unique()) | set(df['Назва міста2'].unique()))
+    n_cities = len(cities)
+
+    # Створюємо словник для індексації міст
+    city_to_idx = {city: idx for idx, city in enumerate(cities)}
+
+    # Ініціалізуємо матрицю відстаней великими значеннями
+    distances = np.full((n_cities, n_cities), np.inf)
+    np.fill_diagonal(distances, 0)  # відстань від міста до себе = 0
+
+    # Заповнюємо матрицю відомими відстанями
+    for _, row in df.iterrows():
+        city1_idx = city_to_idx[row['Назва міста1']]
+        city2_idx = city_to_idx[row['Назва міста2']]
+        distance = row['Відстань (км)']
+        distances[city1_idx, city2_idx] = distance
+        distances[city2_idx, city1_idx] = distance
+
+    # Алгоритм Флойда-Уоршелла для знаходження найкоротших шляхів
+    for k in range(n_cities):
+        for i in range(n_cities):
+            for j in range(n_cities):
+                if distances[i, k] != np.inf and distances[k, j] != np.inf:
+                    distances[i, j] = min(
+                        distances[i, j],
+                        distances[i, k] + distances[k, j]
+                    )
+
+    # Перевірка на наявність недосяжних міст
+    if np.isinf(distances).any():
+        print("Увага: Деякі міста не мають зв'язку між собою!")
+        # Заміняємо inf на максимальне значення відстані
+        max_distance = np.max(distances[~np.isinf(distances)])
+        distances[np.isinf(distances)] = max_distance * 1.5
+
+    return distances, cities
+
+# Функція для кластеризації методом K-means
+def kmeans_clustering(distances, n_clusters):
+    # Створюємо початкові центроїди випадковим чином з даних
+    centroids = np.random.choice(range(distances.shape[0]), size=n_clusters, replace=False)
+    centroids = distances[centroids]
+
+    # Ініціалізуємо змінну для старих міток
+    previous_labels = None
 
     while True:
-        # Визначення кластера для кожної точки
-        distances = pairwise_distances(adj_matrix, centroids)
-        labels = np.argmin(distances, axis=1)
+        # Призначення точок до найближчого центроїду
+        distances_to_centroids = np.array([np.linalg.norm(distances - centroid, axis=1) for centroid in centroids])
+        labels = np.argmin(distances_to_centroids, axis=0)
 
-        for i, dist in enumerate(distances):
-            if dist[0] == dist[1]:  # Якщо відстані рівні
-                labels[i] = np.random.choice([0, 1])  # Випадковий вибір між двома кластерами
+        # Оновлення центроїдів
+        new_centroids = np.array([distances[labels == k].mean(axis=0) for k in range(n_clusters)])
 
-        # Перевірка на завершення: якщо кластери більше не змінюються
-        if np.array_equal(labels, prev_labels):
+        # Оновлення центроїдів
+        centroids = new_centroids
+
+        # Перевірка стабільності кластерів
+        if np.array_equal(labels, previous_labels):
             break
 
-        prev_labels = labels
+        # Оновлюємо попередні мітки
+        previous_labels = labels
 
-        # Оновлення кластерних центрів
-        centroids = np.array([adj_matrix[labels == i].mean(axis=0) for i in range(n_clusters)])
-
-    # Групування вузлів за кластерами
-    clustered_nodes = {i: [] for i in range(n_clusters)}
-
-    for node, cluster in zip(nodes, labels):
-        clustered_nodes[cluster].append(node)
-
-    return clustered_nodes
+    return labels
