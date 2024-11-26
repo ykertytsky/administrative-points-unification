@@ -33,7 +33,6 @@ def read_distance_data(file_path):
         if df['Відстань (км)'].isnull().any():
             raise ValueError("Стовпець 'Відстань (км)' повинен містити лише числові значення.")
 
-        print("Дані успішно зчитано!")
         return df
 
     except FileNotFoundError:
@@ -110,7 +109,7 @@ def kmeans_clustering(distances, cities, n_clusters):
         previous_labels = labels
 
     # Return cities and their corresponding clusters
-    city_clusters = {city: label for city, label in zip(cities, labels)}
+    city_clusters = dict(zip(cities, labels))
     
     return city_clusters
 
@@ -129,12 +128,12 @@ def clusters_to_nx_graph(city_clusters, cities, distances):
     """
     G = nx.Graph()
 
-    # Додаємо вузли до графа з інформацією про кластер
+    # adding nodes with info about cluster
     for city in cities:
         cluster = city_clusters.get(city)
         G.add_node(city, cluster=cluster)
 
-    # Додаємо ребра для міст в одному кластері
+    # Adding Edges
     for i, city1 in enumerate(cities):
         for j, city2 in enumerate(cities):
             if city_clusters.get(city1) == city_clusters.get(city2) and i != j:  # Only for cities in the same cluster
@@ -142,5 +141,3 @@ def clusters_to_nx_graph(city_clusters, cities, distances):
                 G.add_edge(city1, city2, weight=weight)
 
     return G
-
-
