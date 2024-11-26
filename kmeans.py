@@ -21,7 +21,7 @@ def read_distance_data(file_path):
         # Перевірка наявності потрібних стовпців
         required_columns = {'Назва міста1', 'Назва міста2', 'Відстань (км)'}
         if not required_columns.issubset(df.columns):
-            raise ValueError(f"CSV файл повинен містити такі стовпці: {', '.join(required_columns)}")
+            raise ValueError(f"Файл повинен містити такі стовпці: {', '.join(required_columns)}")
 
         # Перевірка на відсутність порожніх значень
         if df.isnull().any().any():
@@ -39,10 +39,15 @@ def read_distance_data(file_path):
         print(f"Помилка: Файл за адресою '{file_path}' не знайдено.")
     except ValueError as e:
         print(f"Помилка у даних: {e}")
-    except Exception as e:
-        print(f"Невідома помилка: {e}")
 
 def create_distance_matrix(df):
+    """
+    Creates matrix of distances between each city
+    Args:
+        df (_type_): DataFrame
+
+    Returns: List of all cities and matrix of distances
+    """
     # Отримуємо унікальні міста
     cities = list(set(df['Назва міста1'].unique()) | set(df['Назва міста2'].unique()))
     n_cities = len(cities)
@@ -81,9 +86,16 @@ def create_distance_matrix(df):
 
     return distances, cities
 
-# Функція для кластеризації методом K-means
 def kmeans_clustering(distances, n_clusters):
-    # Створюємо початкові центроїди випадковим чином з даних
+    """
+    Clustering using K-Means method
+    Args:
+        distances: matrix of distances
+        n_clusters: number of clusters
+
+    Returns: List of labels (index stands for city, value for cluster)
+    """
+    # Створюємо початкові центроїди випадковим чином
     centroids = np.random.choice(range(distances.shape[0]), size=n_clusters, replace=False)
     centroids = distances[centroids]
 
@@ -92,7 +104,9 @@ def kmeans_clustering(distances, n_clusters):
 
     while True:
         # Призначення точок до найближчого центроїду
-        distances_to_centroids = np.array([np.linalg.norm(distances - centroid, axis=1) for centroid in centroids])
+        distances_to_centroids = np.array([
+        np.linalg.norm(distances - centroid, axis=1) for centroid in centroids
+        ])
         labels = np.argmin(distances_to_centroids, axis=0)
 
         # Оновлення центроїдів
