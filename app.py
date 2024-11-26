@@ -1,71 +1,120 @@
+"""
+ADministative Points Unification
+"""
+
 import argparse
-import pandas as pd
-import numpy as np
 import networkx as nx
 import matplotlib.pyplot as plt
+from rich import print
+from rich.console import Console
+from rich.progress import track
+
+
+from kmeans import *
 
 
 ######## ------------------------ ########
 #        Working with files
 ######## ------------------------ ########
-def readfile(filename):
-    df = pd.read_csv(filename, names=["Point1", "Point2", "distance"])
-
-    # Nodes
-    nodes = list(set(df["Point1"]).union(set(df["Point2"])))
-    node_indices = {node: index for index, node in enumerate(nodes)}
-
-    n = len(nodes)
-
-    adj_matrix = np.full((n, n), np.inf)
-
-    for _, row in df.iterrows():
-        i, j = node_indices[row["Point1"]], node_indices[row["Point2"]]
-        adj_matrix[i, j] = row["distance"]
-        adj_matrix[j, i] = row["distance"]
-
-    adj_matrix_pretty = pd.DataFrame(adj_matrix, index=nodes, columns=nodes)
-    
-    return adj_matrix_pretty
-
-
-
-
-def visualize_communities(G, communities):
+def visualize_communities(graph, communities):
     """
     Visualize graph with community coloring
     """
+    # Create a dictionary that maps each node to its community
+    node_community_map = {}
+    for community_id, community in enumerate(communities):
+        for node in community:
+            node_community_map[node] = community_id
+
+    # Generate a list of colors corresponding to each community
+    colors = [node_community_map[node] for node in graph.nodes()]
+
+    # Cтворення лейауту для графу
+    pos = nx.spring_layout(graph, seed=42)
+
+    # Візуалізація графу з обраними параметрами
     plt.figure(figsize=(12, 8))
-    
-    # Create color map
-    color_palette = plt.cm.get_cmap('tab20')
-    community_colors = {}
-    for i, comm in enumerate(communities):
-        for node in comm:
-            community_colors[node] = color_palette(i % 20)
-    
-    # Draw graph
-    pos = nx.spring_layout(G, seed=42)
-    nx.draw_networkx_nodes(
-        G,
+    nx.draw_networkx(
+        graph,
         pos,
-        node_color=[community_colors[node] for node in G.nodes()],
-        node_size=300
+        node_color=colors,  
+        cmap = plt.colormaps['tab20'](len(communities)),  # Інший колір для кожного комʼюніті
+        with_labels=True,
+        node_size=500,
+        font_size=10,
+        edge_color='gray',
+        width=0.5
     )
-    nx.draw_networkx_edges(G, pos, alpha=0.5)
-    nx.draw_networkx_labels(G, pos)
-    
-    plt.title("Community Structure Visualization")
-    plt.axis('off')
-    plt.tight_layout()
+
+    plt.title("Louvain Community Detection Visualization")
     plt.show()
 
 
 
+def main():
+    console = Console()
 
+    parser = argparse.ArgumentParser(
+        description="🎨 Graph Clustering and Visualization",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
+
+    # Required argument
+    parser.add_argument(
+        "file_path", 
+        type=str, 
+        help="Path to the CSV data file containing city distances"
+    )
+
+    # Optional arguments
+    parser.add_argument(
+        "--kmeans", 
+        action="store_true", 
+        help="Use k-means clustering algorithm (default is Louvain)"
+    )
+    parser.add_argument(
+        "--num_clusters", 
+        type=int, 
+        default=3, 
+        help="Number of clusters for k-means (default is 3)"
+    )
+
+    # Parse arguments
+    args = parser.parse_args()
+
+    # Log starting message
+    console.print(f"🚀 Starting graph clustering and visualization...", style="bold green")
+
+    try:
+        # Read file and process data
+        console.print(f"📖 Reading data from: {args.file_path}", style="bold blue")
+        df = read_distance_data(args.file_path)
+        distances, cities = create_distance_matrix(df)
+
+        if args.kmeans:
+            console.print(f"🔍 Performing k-means clustering...", style="bold yellow")
+            city_clusters = kmeans_clustering(distances, cities, args.num_clusters)
+
+        # Group cities by clusters
+        communities = {}
+        for city, cluster in city_clusters.items():
+            if cluster not in communities:
+                communities[cluster] = []
+            communities[cluster].append(city)
+
+        communities_list = list(communities.values())
+
+        # Visualize the results
+        console.print(f"📊 Visualizing clusters...", style="bold magenta")
+        G = clusters_to_nx_graph(city_clusters, cities, distances)
+        visualize_communities(G, communities_list)
+
+        console.print(f"✔️ Clustering and visualization complete!", style="bold green")
+
+    except Exception as e:
+        console.print(f"[bold red]Error: {e}[/bold red]")
+        exit(1)
 
 if __name__ == "__main__":
-    data = readfile("data.csv")
-
-    print(data)
+    main()
 

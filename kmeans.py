@@ -4,6 +4,7 @@ K MEANS
 
 import pandas as pd
 import numpy as np
+import networkx as nx
 
 def read_distance_data(file_path):
     """
@@ -82,7 +83,7 @@ def create_distance_matrix(df):
     return distances, cities
 
 # Функція для кластеризації методом K-means
-def kmeans_clustering(distances, n_clusters):
+def kmeans_clustering(distances, cities, n_clusters):
     # Створюємо початкові центроїди випадковим чином з даних
     centroids = np.random.choice(range(distances.shape[0]), size=n_clusters, replace=False)
     centroids = distances[centroids]
@@ -108,4 +109,38 @@ def kmeans_clustering(distances, n_clusters):
         # Оновлюємо попередні мітки
         previous_labels = labels
 
-    return labels
+    # Return cities and their corresponding clusters
+    city_clusters = {city: label for city, label in zip(cities, labels)}
+    
+    return city_clusters
+
+
+def clusters_to_nx_graph(city_clusters, cities, distances):
+    """
+    Створює граф NetworkX на основі кластерів, отриманих з K-Means.
+    
+    Args:
+        city_clusters (dict): Словник з містами та їх класифікацією.
+        cities (list): Список назв міст.
+        distances (np.ndarray or list): Матриця відстаней між містами.
+    
+    Returns:
+        nx.Graph: Об'єкт графа NetworkX.
+    """
+    G = nx.Graph()
+
+    # Додаємо вузли до графа з інформацією про кластер
+    for city in cities:
+        cluster = city_clusters.get(city)
+        G.add_node(city, cluster=cluster)
+
+    # Додаємо ребра для міст в одному кластері
+    for i, city1 in enumerate(cities):
+        for j, city2 in enumerate(cities):
+            if city_clusters.get(city1) == city_clusters.get(city2) and i != j:  # Only for cities in the same cluster
+                weight = distances[i, j]
+                G.add_edge(city1, city2, weight=weight)
+
+    return G
+
+
