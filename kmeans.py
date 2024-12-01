@@ -1,18 +1,19 @@
-'''
+"""
 K MEANS
-'''
+"""
 
 import pandas as pd
 import numpy as np
 import networkx as nx
 
+
 def read_distance_data(file_path):
     """
     Зчитує дані з CSV-файлу у форматі, потрібному для програми.
-    
+
     Args:
         file_path (str): Шлях до CSV-файлу.
-    
+
     Returns:
         pd.DataFrame: DataFrame з даними про відстані.
     """
@@ -20,18 +21,22 @@ def read_distance_data(file_path):
         df = pd.read_csv(file_path)
 
         # Перевірка наявності потрібних стовпців
-        required_columns = {'Назва міста1', 'Назва міста2', 'Відстань (км)'}
+        required_columns = {"Назва міста1", "Назва міста2", "Відстань (км)"}
         if not required_columns.issubset(df.columns):
-            raise ValueError(f"CSV файл повинен містити такі стовпці: {', '.join(required_columns)}")
+            raise ValueError(
+                f"CSV файл повинен містити такі стовпці: {', '.join(required_columns)}"
+            )
 
         # Перевірка на відсутність порожніх значень
         if df.isnull().any().any():
             raise ValueError("CSV файл містить порожні значення. Перевірте дані.")
 
         # Перетворення типу стовпця 'Відстань (км)' на числовий
-        df['Відстань (км)'] = pd.to_numeric(df['Відстань (км)'], errors='coerce')
-        if df['Відстань (км)'].isnull().any():
-            raise ValueError("Стовпець 'Відстань (км)' повинен містити лише числові значення.")
+        df["Відстань (км)"] = pd.to_numeric(df["Відстань (км)"], errors="coerce")
+        if df["Відстань (км)"].isnull().any():
+            raise ValueError(
+                "Стовпець 'Відстань (км)' повинен містити лише числові значення."
+            )
 
         return df
 
@@ -42,9 +47,10 @@ def read_distance_data(file_path):
     except Exception as e:
         print(f"Невідома помилка: {e}")
 
+
 def create_distance_matrix(df):
     # Отримуємо унікальні міста
-    cities = list(set(df['Назва міста1'].unique()) | set(df['Назва міста2'].unique()))
+    cities = list(set(df["Назва міста1"].unique()) | set(df["Назва міста2"].unique()))
     n_cities = len(cities)
 
     # Створюємо словник для індексації міст
@@ -56,9 +62,9 @@ def create_distance_matrix(df):
 
     # Заповнюємо матрицю відомими відстанями
     for _, row in df.iterrows():
-        city1_idx = city_to_idx[row['Назва міста1']]
-        city2_idx = city_to_idx[row['Назва міста2']]
-        distance = row['Відстань (км)']
+        city1_idx = city_to_idx[row["Назва міста1"]]
+        city2_idx = city_to_idx[row["Назва міста2"]]
+        distance = row["Відстань (км)"]
         distances[city1_idx, city2_idx] = distance
         distances[city2_idx, city1_idx] = distance
 
@@ -68,8 +74,7 @@ def create_distance_matrix(df):
             for j in range(n_cities):
                 if distances[i, k] != np.inf and distances[k, j] != np.inf:
                     distances[i, j] = min(
-                        distances[i, j],
-                        distances[i, k] + distances[k, j]
+                        distances[i, j], distances[i, k] + distances[k, j]
                     )
 
     # Перевірка на наявність недосяжних міст
@@ -81,10 +86,13 @@ def create_distance_matrix(df):
 
     return distances, cities
 
+
 # Функція для кластеризації методом K-means
 def kmeans_clustering(distances, cities, n_clusters):
     # Створюємо початкові центроїди випадковим чином з даних
-    centroids = np.random.choice(range(distances.shape[0]), size=n_clusters, replace=False)
+    centroids = np.random.choice(
+        range(distances.shape[0]), size=n_clusters, replace=False
+    )
     centroids = distances[centroids]
 
     # Ініціалізуємо змінну для старих міток
@@ -92,11 +100,15 @@ def kmeans_clustering(distances, cities, n_clusters):
 
     while True:
         # Призначення точок до найближчого центроїду
-        distances_to_centroids = np.array([np.linalg.norm(distances - centroid, axis=1) for centroid in centroids])
+        distances_to_centroids = np.array(
+            [np.linalg.norm(distances - centroid, axis=1) for centroid in centroids]
+        )
         labels = np.argmin(distances_to_centroids, axis=0)
 
         # Оновлення центроїдів
-        new_centroids = np.array([distances[labels == k].mean(axis=0) for k in range(n_clusters)])
+        new_centroids = np.array(
+            [distances[labels == k].mean(axis=0) for k in range(n_clusters)]
+        )
 
         # Оновлення центроїдів
         centroids = new_centroids
@@ -110,19 +122,19 @@ def kmeans_clustering(distances, cities, n_clusters):
 
     # Return cities and their corresponding clusters
     city_clusters = dict(zip(cities, labels))
-    
+
     return city_clusters
 
 
 def clusters_to_nx_graph(city_clusters, cities, distances):
     """
     Створює граф NetworkX на основі кластерів, отриманих з K-Means.
-    
+
     Args:
         city_clusters (dict): Словник з містами та їх класифікацією.
         cities (list): Список назв міст.
         distances (np.ndarray or list): Матриця відстаней між містами.
-    
+
     Returns:
         nx.Graph: Об'єкт графа NetworkX.
     """
@@ -136,7 +148,9 @@ def clusters_to_nx_graph(city_clusters, cities, distances):
     # Adding Edges
     for i, city1 in enumerate(cities):
         for j, city2 in enumerate(cities):
-            if city_clusters.get(city1) == city_clusters.get(city2) and i != j:  # Only for cities in the same cluster
+            if (
+                city_clusters.get(city1) == city_clusters.get(city2) and i != j
+            ):  # Only for cities in the same cluster
                 weight = distances[i, j]
                 G.add_edge(city1, city2, weight=weight)
 
