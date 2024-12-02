@@ -1,0 +1,101 @@
+
+def louvain_community_detection(graph):
+    """
+    Implement Louvain community detection algorithm with error handling
+    """
+    try:
+        # Verify graph nodes
+        if not graph.nodes():
+            raise ValueError("Graph is empty")
+
+        # Convert graph to dictionary representation
+        graph_dict = create_graph_dict(graph)
+        total_weight = calculate_total_weight(graph_dict)
+
+        # Initialize each node in its own community
+        node_communities = {node: {node} for node in graph_dict}
+        community_of_node = {node: node for node in graph_dict}
+
+        improved = True
+        iteration = 0
+        max_iterations = 100  # Prevent infinite loop
+
+        while improved and iteration < max_iterations:
+            improved = False
+            iteration += 1
+
+            # Randomize node order for each iteration
+            nodes = list(graph_dict.keys())
+            random.shuffle(nodes)
+
+            for node in nodes:
+                current_community = community_of_node.get(node)
+                
+                # Skip if node not in any community (defensive programming)
+                if current_community is None:
+                    print(f"Warning: Node {node} has no community assignment")
+                    continue
+
+                # Rest of the existing Louvain algorithm logic remains the same
+                node_communities[current_community].remove(node)
+
+                # Neighbor communities logic
+                neighbor_communities = set()
+                for neighbor in graph_dict[node]:
+                    neighbor_community = community_of_node.get(neighbor)
+                    if neighbor_community is not None:
+                        neighbor_communities.add(neighbor_community)
+
+                best_community = current_community
+                best_modularity_gain = 0
+
+                for test_community in neighbor_communities:
+                    node_communities[test_community].add(node)
+
+                    # Calculate modularity gain
+                    gain = modularity_gain(
+                        graph_dict, total_weight, node, test_community, node_communities
+                    )
+
+                    if gain > best_modularity_gain:
+                        best_modularity_gain = gain
+                        best_community = test_community
+
+                    # Remove node from test community if not chosen
+                    if best_community != test_community:
+                        node_communities[test_community].remove(node)
+
+                # Add node to best community
+                node_communities[best_community].add(node)
+                community_of_node[node] = best_community
+
+                # Check if improvement occurred
+                if best_community != current_community:
+                    improved = True
+
+        # Convert communities to list of sets
+        return node_communities
+
+    except Exception as e:
+        print(f"Error in Louvain community detection: {e}")
+        # Optional: print node details for debugging
+        for node in graph.nodes():
+            print(f"Node: {node}, Type: {type(node)}")
+        raise
+
+def create_graph_dict(graph):
+    """
+    Convert NetworkX graph to adjacency dictionary with edge weights
+    Add error handling for unexpected node types
+    """
+    graph_dict = {}
+    for node in graph.nodes():
+        try:
+            graph_dict[node] = {
+                str(neighbor): graph[node][neighbor].get("weight", 1.0)
+                for neighbor in graph.neighbors(node)
+            }
+        except Exception as e:
+            print(f"Error processing node {node}: {e}")
+            raise
+    return graph_dict

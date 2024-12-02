@@ -3,6 +3,63 @@ import random
 
 import matplotlib.pyplot as plt
 
+import pandas as pd
+
+def read_distance_data(file_path):
+    """
+    Read CSV file with city distance data
+    
+    Args:
+        file_path (str): Path to the CSV file
+    
+    Returns:
+        pd.DataFrame: Processed distance data
+    """
+    try:
+        # Read CSV file
+        data = pd.read_csv(file_path, encoding='utf-8')
+        
+        # Rename columns to standard format
+        data.rename(
+            columns={
+                "Назва міста1": "Point1", 
+                "Назва міста2": "Point2", 
+                "Відстань (км)": "distance"
+            },
+            inplace=True
+        )
+        
+        # Validate data
+        required_columns = ['Point1', 'Point2', 'distance']
+        if not all(col in data.columns for col in required_columns):
+            raise ValueError(f"Missing required columns. Need: {required_columns}")
+        
+        return data
+    
+    except Exception as e:
+        print(f"Error reading CSV file: {e}")
+        raise
+
+def create_graph_from_csv(file_path):
+    """
+    Create NetworkX graph from CSV distance data
+    
+    Args:
+        file_path (str): Path to the CSV file
+    
+    Returns:
+        nx.Graph: Graph with cities as nodes and distances as edge weights
+    """
+    # Read distance data
+    data = read_distance_data(file_path)
+    
+    # Create graph
+    G = nx.Graph()
+    for _, row in data.iterrows():
+        G.add_edge(row["Point1"], row["Point2"], weight=row["distance"])
+    
+    return G
+
 
 def create_graph_dict(graph):
     """
@@ -15,7 +72,6 @@ def create_graph_dict(graph):
             for neighbor in graph.neighbors(node)
         }
     return graph_dict
-
 
 def calculate_total_weight(graph_dict):
     """
@@ -56,6 +112,7 @@ def louvain_community_detection(graph):
     """
     Implement Louvain community detection algorithm
     """
+    import random
     # Convert graph to dictionary representation
     graph_dict = create_graph_dict(graph)
     total_weight = calculate_total_weight(graph_dict)
@@ -112,21 +169,25 @@ def louvain_community_detection(graph):
                 improved = True
 
     # Convert communities to list of sets
-    return list(node_communities.values())
+    return node_communities
 
 
-def visualize_communities(graph, communities):
+def louvian_visualize_communities(graph, communities):
     """
     Visualize graph with community coloring
+    Robust version to handle missing nodes
     """
     # Create a dictionary that maps each node to its community
     node_community_map = {}
-    for community_id, community in enumerate(communities):
+    for community_id, community in enumerate(communities.values()):
         for node in community:
             node_community_map[node] = community_id
 
-    # Generate a list of colors corresponding to each community
-    colors = [node_community_map[node] for node in graph.nodes()]
+    # Generate a list of colors with fallback
+    colors = []
+    for node in graph.nodes():
+        # Use a default color (e.g., gray) if node not in any community
+        colors.append(node_community_map.get(node, len(communities)))
 
     # Create a layout for the graph
     pos = nx.spring_layout(graph, seed=42)
@@ -136,10 +197,8 @@ def visualize_communities(graph, communities):
     nx.draw_networkx(
         graph,
         pos,
-        node_color=colors,  # Color nodes by their community
-        cmap=plt.cm.get_cmap(
-            "tab20", len(communities)
-        ),  # Color map with a different color for each community
+        node_color=colors,
+        cmap=plt.cm.get_cmap("tab20", len(communities) + 1),
         with_labels=True,
         node_size=500,
         font_size=10,
@@ -152,12 +211,28 @@ def visualize_communities(graph, communities):
     plt.show()
 
 
+def communities_to_dict(communities):
+    """
+    Convert communities from Louvain detection to a dictionary where
+    keys are re-indexed community IDs and values are lists of non-empty communities.
+
+    Args:
+        communities (dict): Communities dictionary from louvain_community_detection
+
+    Returns:
+        dict: Mapping of re-indexed community IDs to lists of nodes, excluding empty communities
+    """
+    # Filter out empty communities and create a new list
+    non_empty_communities = [community for community in communities.values() if community]
+
+    # Re-index the communities and return as a dictionary
+    return {
+        idx: list(community)
+        for idx, community in enumerate(non_empty_communities)
+    }
+
+
+
 if __name__ == "__main__":
-    # Create a graph (for example, from some data or an existing NetworkX graph)
-    G = nx.erdos_renyi_graph(30, 0.05)  # Example graph for testing
-
-    # Apply Louvain community detection
-    communities = louvain_community_detection(G)
-
-    # Visualize the communities
-    visualize_communities(G, communities)
+    G = create_graph_from_csv("data.csv")
+    louvian_visualize_communities(G, louvain_community_detection(G))

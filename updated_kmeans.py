@@ -4,15 +4,14 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 
-# Custom balanced k-means without max_iter
 def balanced_kmeans(graph, k):
-    # Step 1: Initialize centroids randomly
     nodes = list(graph.nodes)
-    np.random.seed(42)  # Fix random seed for reproducibility
+    np.random.seed(42)
     centroids = np.random.choice(nodes, size=k, replace=False)
+    max_iterations = 100
+    iteration = 0
 
-    while True:  # Infinite loop, will break on convergence
-        # Step 2: Assign nodes to nearest centroid with even distribution
+    while iteration < max_iterations:
         clusters = {i: [] for i in range(k)}
         for node in nodes:
             distances = [
@@ -21,34 +20,42 @@ def balanced_kmeans(graph, k):
             ]
             assigned_cluster = np.argmin(distances)
 
-            # Enforce even distribution by limiting cluster size
             if len(clusters[assigned_cluster]) < len(nodes) // k:
                 clusters[assigned_cluster].append(node)
             else:
-                # If full, assign to the next closest cluster
                 sorted_distances = sorted(enumerate(distances), key=lambda x: x[1])
                 for idx, _ in sorted_distances:
                     if len(clusters[idx]) < len(nodes) // k:
                         clusters[idx].append(node)
                         break
 
-        # Step 3: Update centroids
+        for cluster_id in clusters:
+            if not clusters[cluster_id]:  # Handle empty clusters
+                clusters[cluster_id].append(nodes.pop())
+
         new_centroids = []
         for i in range(k):
             subgraph = graph.subgraph(clusters[i])
-            new_centroid = min(
-                subgraph.nodes,
-                key=lambda n: sum(nx.shortest_path_length(subgraph, source=n).values()),
-            )
+            if not subgraph.nodes:  # Handle empty subgraph case
+                new_centroid = np.random.choice(nodes)
+            else:
+                new_centroid = min(
+                    subgraph.nodes,
+                    key=lambda n: sum(nx.shortest_path_length(subgraph, source=n).values()),
+                )
             new_centroids.append(new_centroid)
 
-        # Check for convergence: if centroids do not change, break the loop
         if set(new_centroids) == set(centroids):
             break
 
-        centroids = new_centroids  # Update centroids for next iteration
+        centroids = new_centroids
+        iteration += 1
+
+    if iteration == max_iterations:
+        print("Warning: Maximum iterations reached. Clustering may not have converged.")
 
     return clusters
+
 
 
 # Visualize the results
