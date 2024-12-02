@@ -2,25 +2,21 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from sklearn.preprocessing import normalize
 
 
-# Custom k-means with even distribution
-def balanced_kmeans(graph, k, max_iter=100):
+# Custom balanced k-means without max_iter
+def balanced_kmeans(graph, k):
     # Step 1: Initialize centroids randomly
     nodes = list(graph.nodes)
-    np.random.seed(42)
+    np.random.seed(42)  # Fix random seed for reproducibility
     centroids = np.random.choice(nodes, size=k, replace=False)
 
-    # Step 2: Iterative clustering
-    for _ in range(max_iter):
-        # Assign nodes to nearest centroid with even distribution
+    while True:  # Infinite loop, will break on convergence
+        # Step 2: Assign nodes to nearest centroid with even distribution
         clusters = {i: [] for i in range(k)}
         for node in nodes:
             distances = [
-                nx.shortest_path_length(
-                    graph, source=node, target=centroid, weight="weight"
-                )
+                nx.shortest_path_length(graph, source=node, target=centroid, weight="weight")
                 for centroid in centroids
             ]
             assigned_cluster = np.argmin(distances)
@@ -46,9 +42,11 @@ def balanced_kmeans(graph, k, max_iter=100):
             )
             new_centroids.append(new_centroid)
 
-        if set(new_centroids) == set(centroids):  # Check for convergence
+        # Check for convergence: if centroids do not change, break the loop
+        if set(new_centroids) == set(centroids):
             break
-        centroids = new_centroids
+
+        centroids = new_centroids  # Update centroids for next iteration
 
     return clusters
 
@@ -75,18 +73,14 @@ def visualize_clusters(graph, clusters, title="Balanced K-Means Clustering"):
     plt.show()
 
 
-# Load your graph
-# Replace this with your graph loading code
+# Load your graph data from CSV
 data = pd.read_csv("data.csv")
 data.rename(
-    columns={
-        "Назва міста1": "Point1",
-        "Назва міста2": "Point2",
-        "Відстань (км)": "distance",
-    },
+    columns={"Назва міста1": "Point1", "Назва міста2": "Point2", "Відстань (км)": "distance"},
     inplace=True,
 )
 
+# Create graph and add edges with weights
 G = nx.Graph()
 for _, row in data.iterrows():
     G.add_edge(row["Point1"], row["Point2"], weight=row["distance"])
