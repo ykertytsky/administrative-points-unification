@@ -1,110 +1,119 @@
-### K Means
+## **1. Імпортування бібліотек**
 
-1. **Ініціалізація кластерних центрів**
+`import networkx as nx`
+`import numpy as np`
+`import pandas as pd`
+`import matplotlib.pyplot as plt`
 
-`n_samples = adj_matrix.shape[0]`
-`centroids = adj_matrix[np.random.choice(n_samples, n_clusters, replace=False)]`
-
-- `adj_matrix.shape[0]`: Визначає кількість рядків у матриці (кількість вузлів).
-- `np.random.choice(n_samples, n_clusters, replace=False)`: Обирає `n_clusters` випадкових індексів без повторень з доступних вузлів.
-    - **Приклад**: Якщо у вас 5 вузлів і ви хочете 2 кластери, функція вибере два випадкові вузли як початкові центроїди, наприклад, вузли 2 і 4.
-- `centroids`: Із матриці `adj_matrix` беруться рядки (вузли), що відповідають обраним індексам. Це будуть початкові центроїди кластерів.
-
-2. **Визначення кластера для кожної точки**
-
-`distances = pairwise_distances(adj_matrix, centroids)`
-`labels = np.argmin(distances, axis=1)`
-
-`pairwise_distances`: Ця функція з бібліотеки `sklearn.metrics` обчислює відстані між кожним вузлом (рядком) та центроїдами кластерів.
-
-- На вхід подаються два масиви: `adj_matrix` (вузли) і `centroids` (центроїди).
-
-- **Результат**: Матриця розміром `(n_samples, n_clusters)`, де кожен елемент `[i, j]` — це відстань між вузлом `i` і центроїдом `j`.
-- **Приклад**: Якщо у вас є 5 вузлів і 2 центроїди, результат виглядатиме так:
-`[[1.2, 0.8],  # Відстань вузла 1 до центроїдів 1 і 2`
- `[0.5, 1.3],  # Відстань вузла 2 до центроїдів 1 і 2`
- `...]`
- 
-`np.argmin(distances, axis=1)`: Визначає індекс (номер) найближчого центроїда для кожного вузла.
-
-- **Результат**: Одновимірний масив `labels`, де `labels[i]` — це кластер, до якого належить вузол `i`
-`
-3. **Перевірка на завершення**
-
-`if np.array_equal(labels, prev_labels):`
-    `break`
-
-`np.array_equal(labels, prev_labels)`: Перевіряє, чи класифікація вузлів (`labels`) змінилася у порівнянні з попередньою ітерацією.
-
-- Якщо класифікація не змінюється, алгоритм завершує роботу (знайдено стабільні кластери).
-
-4. **Оновлення кластерних центрів**
-
-`centroids = np.array([adj_matrix[labels == i].mean(axis=0) for i in range(n_clusters)])`
-
-- Для кожного кластера (`i`) визначається новий центроїд:
-    - `adj_matrix[labels == i]`: Вибирає всі вузли, які належать до кластера `i`.
-    - `.mean(axis=0)`: Обчислює середнє значення цих вузлів по всіх координатах. Це новий центроїд.
-- `centroids`: Містить оновлені центроїди для всіх кластерів.
-    - **Приклад**: Якщо у кластері 1 вузли 2, 3 і 4, то новий центроїд — середнє цих вузлів.
-
-5. **Формування результатів**
-
-`clustered_nodes = {i: [] for i in range(n_clusters)}`
-
-`for node, cluster in zip(nodes, labels):`
-    `clustered_nodes[cluster].append(node)`
-
-
-- `clustered_nodes`: Створює порожній словник, де ключі — це номери кластерів, а значення — списки вузлів, які до них належать.
-- `zip(nodes, labels)`: Поєднує вузли і їхні класи (кластеризацію).
-    - **Приклад**: Якщо `nodes = ['A', 'B', 'C']` і `labels = [0, 1, 0]`, то вузол `A` належить до кластера 0, вузол `B` — до кластера 1.
-- `clustered_nodes[cluster].append(node)`: Додає вузол до відповідного кластера.
-
-
----
-### Що роблять імпортовані функції?
-
-1. **`numpy`**:
-    
-    - Використовується для роботи з масивами, обчислень середніх значень та випадкової ініціалізації.
-    - Наприклад:
-        - `np.random.choice` для вибору початкових центроїдів.
-        - `np.array` для створення масивів.
-2. **`pairwise_distances` (з `sklearn.metrics`)**:
-    
-    - Обчислює матрицю попарних відстаней між усіма вузлами і центроїдами.
-    - Підтримує різні метрики, наприклад, "евклідову" відстань (за замовчуванням).
+- **`networkx` (nx)**: бібліотека для створення, маніпулювання та аналізу графів і мереж.
+- **`numpy` (np)**: бібліотека для роботи з масивами та виконання числових обчислень.
+- **`pandas` (pd)**: бібліотека для роботи з таблицями та аналізу даних у форматі `DataFrame`.
+- **`matplotlib.pyplot` (plt)**: бібліотека для створення візуалізацій.
 
 ---
 
-### Приклад роботи
+## **2. Функція `balanced_kmeans`**
 
-- У вас є вузли `['A', 'B', 'C', 'D']` та матриця відстаней:
-- `[[0.0, 1.2, 0.8, 2.5],`
- `[1.2, 0.0, 1.5, 0.9],`
- `[0.8, 1.5, 0.0, 1.1],`
- `[2.5, 0.9, 1.1, 0.0]]`
+`def balanced_kmeans(graph, k):`
+    `# Step 1: Initialize centroids randomly`
+    `nodes = list(graph.nodes)`
+    `np.random.seed(42)  # Fix random seed for reproducibility`
+    `centroids = np.random.choice(nodes, size=k, replace=False)`
 
-- Спочатку обираються випадкові центроїди, наприклад, вузли `A` та `C`.
-- Алгоритм класифікує вузли за відстанню до центроїдів, наприклад:
-    - Вузол `A` ближчий до центроїда 0.
-    - Вузол `B` ближчий до центроїда 1.
-- Алгоритм оновлює центроїди, обчислюючи середнє положення вузлів у кластері.
-- Процес повторюється, поки кластери не стабілізуються.
+- **`graph`** – це об'єкт графу `networkx.Graph`, який передається у функцію.
+- **`k`** – кількість кластерів, на які потрібно поділити граф.
+- **`nodes`** – список усіх вузлів графу (вершин).
+- **`np.random.seed(42)`** – фіксує випадковий генератор для відтворюваності результатів (щоб алгоритм завжди генерував однакові випадкові значення).
+- **`np.random.choice(nodes, size=k, replace=False)`** – випадковим чином вибирає `k` різних вузлів для ініціалізації центроїдів кластерів.
+
+### Основний цикл (цикл кластеризації)
+
+    while True:  # Infinite loop, will break on convergence
+        # Step 2: Assign nodes to nearest centroid with even distribution
+        clusters = {i: [] for i in range(k)}
+        for node in nodes:
+            distances = [
+                nx.shortest_path_length(graph, source=node, target=centroid, weight="weight")
+                for centroid in centroids
+            ]
+            assigned_cluster = np.argmin(distances)
+
+- **`while True`**: Цикл продовжується, поки центроїди не перестануть змінюватися.
+- **`clusters = {i: [] for i in range(k)}`**: Створюється словник для збереження вузлів кожного кластера.
+- **`nx.shortest_path_length(graph, source=node, target=centroid, weight="weight")`**: Обчислює найкоротшу відстань між вузлом `node` та центроїдом `centroid`.
+    - **`weight="weight"`** означає, що враховується вага ребра.
+ - **`np.argmin(distances)`**: Знаходить індекс центроїда з мінімальною відстанню до вузла.
+
+### Рівномірний розподіл вузлів
+
+            # Enforce even distribution by limiting cluster size
+            if len(clusters[assigned_cluster]) < len(nodes) // k:
+                clusters[assigned_cluster].append(node)
+            else:
+                # If full, assign to the next closest cluster
+                sorted_distances = sorted(enumerate(distances), key=lambda x: x[1])
+                for idx, _ in sorted_distances:
+                    if len(clusters[idx]) < len(nodes) // k:
+                        clusters[idx].append(node)
+                        break
+
+- **`len(nodes) // k`**: максимальна кількість вузлів, яку можна додати в кластер для рівномірного розподілу.
+- Якщо кластер заповнений, вузол додається до наступного найближчого кластеру.
+
+### Оновлення центроїдів
+
+        # Step 3: Update centroids
+        new_centroids = []
+        for i in range(k):
+            subgraph = graph.subgraph(clusters[i])
+            new_centroid = min(
+                subgraph.nodes,
+                key=lambda n: sum(nx.shortest_path_length(subgraph, source=n).values()),
+            )
+            new_centroids.append(new_centroid)
+
+- **`graph.subgraph(clusters[i])`**: створює підграф для вузлів у кластері `i`.
+- **`min(..., key=...)`**: вибирає вузол, сумарна відстань якого до інших вузлів мінімальна (вибір нового центроїда).
+
+### Перевірка на завершення
+
+        # Check for convergence: if centroids do not change, break the loop
+        if set(new_centroids) == set(centroids):
+            break
+
+        centroids = new_centroids  # Update centroids for next iteration
+
+Якщо центроїди не змінилися після ітерації, алгоритм завершує роботу.
+
 ---
-### Додатково:
 
-**Одновимірний масив** — це структура даних, що представляє собою лінійний список елементів.
+## **3. Функція `visualize_clusters`**
 
-Приклад одновимірного масиву:
-`labels = [0, 1, 0, 2, 1]`
+`def visualize_clusters(graph, clusters, title="Balanced K-Means Clustering"):`
+    `pos = nx.spring_layout(graph, seed=42)`
+    `plt.figure(figsize=(12, 8))`
+    `colors = plt.cm.get_cmap("tab10", len(clusters))`
 
-Тут:
+    for cluster_id, nodes in clusters.items():
+        nx.draw_networkx_nodes(
+            graph,
+            pos,
+            nodelist=nodes,
+            node_color=[colors(cluster_id)],
+            label=f"Cluster {cluster_id}",
+        )
+    nx.draw_networkx_edges(graph, pos, alpha=0.5)
+    nx.draw_networkx_labels(graph, pos, font_size=10)
 
-- Міста з індексами 0 і 2 належать до кластеру 0.
-- Міста з індексами 1 і 4 належать до кластеру 1.
-- Місто з індексом 3 належить до кластеру 2.
+    plt.title(title)
+    plt.legend()
+    plt.show()
 
-У задачі, **одновимірний масив `labels`** зберігає мітки (класи) для кожного елемента після кластеризації, щоб вказати, до якого кластеру належить кожен елемент.
+- **`nx.spring_layout(graph)`**: генерує координати для розташування вузлів графу.
+- **`plt.figure(figsize=(12, 8))`**: задає розмір графіку.
+- **`colors = plt.cm.get_cmap("tab10", len(clusters))`**: генерує кольори для кластерів.
+- **`nx.draw_networkx_nodes`**: відображає вузли графу.
+- **`nx.draw_networkx_edges`**: відображає ребра графу.
+- **`nx.draw_networkx_labels`**: відображає підписи вузлів.
 
+---
