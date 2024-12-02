@@ -1,18 +1,9 @@
-"""
-ADministative Points Unification
-"""
-
 import argparse
 import sys
-
 import warnings
-
 import networkx as nx
 import matplotlib.pyplot as plt
-
-
 from rich.console import Console
-
 
 from kmeans import (
     kmeans_clustering,
@@ -21,10 +12,6 @@ from kmeans import (
     create_distance_matrix,
 )
 
-
-######## ------------------------ ########
-#        Working with files
-######## ------------------------ ########
 def visualize_communities(graph, communities):
     """
     Visualize graph with community coloring
@@ -58,9 +45,20 @@ def visualize_communities(graph, communities):
     plt.title("K-means Visualization")
     plt.show()
 
+def print_clusters_visual(clusters):
+    """
+    Prints a visual representation of clusters and their corresponding cities.
 
-def write_clusters(graph, communities):
-    pass
+    Args:
+        clusters (dict): A dictionary where keys are cluster names (or IDs) and
+                         values are lists of city names.
+    """
+    print("\nClusters and their corresponding cities:\n")
+    for cluster_id, cities in clusters.items():
+        Console().print(f"Cluster {cluster_id+1}:", style="bold red")
+        for city in cities:
+            print(f"  - {city}")
+        print("\n")
 
 def main():
     """
@@ -70,7 +68,7 @@ def main():
     console = Console()
 
     parser = argparse.ArgumentParser(
-        description="🎨 Graph Clustering and Visualization"
+        description="Graph Clustering and Visualization"
     )
 
     # Required argument
@@ -103,16 +101,16 @@ def main():
     args = parser.parse_args()
 
     console.print(
-        "🚀 Starting graph clustering...", style="bold green"
+        "Starting graph clustering...", style="bold green"
     )
 
     try:
-        console.print(f"📖 Reading data from: {args.file_path}", style="bold blue")
+        console.print(f"Reading data from: {args.file_path}", style="bold blue")
         df = read_distance_data(args.file_path)
         distances, cities = create_distance_matrix(df)
 
         if args.kmeans:
-            console.print("🔍 Performing k-means clustering...", style="bold yellow")
+            console.print("Performing k-means clustering...", style="bold yellow")
             city_clusters = kmeans_clustering(distances, cities, args.num_clusters)
 
         # Group cities by clusters
@@ -126,18 +124,18 @@ def main():
 
         # Visualize the results
         if args.visual:
-            console.print("📊 Visualizing clusters...", style="bold magenta")
+            console.print("Visualizing clusters...", style="bold magenta")
             G = clusters_to_nx_graph(city_clusters, cities, distances)
             visualize_communities(G, communities_list)
         else:
-            console.print("💻 Showing cluster distribution")
+            console.print("Showing cluster distribution")
+            print_clusters_visual(communities)
 
-        console.print("✔️ Clustering and visualization complete!", style="bold green")
+        console.print("Clustering and visualization complete!", style="bold green")
 
     except Exception as e:
-        console.print(f"[bold red]Error: {e}[/bold red]")
+        console.print(f"Error: {e}")
         sys.exit()
-
 
 if __name__ == "__main__":
     main()
