@@ -5,7 +5,7 @@ import networkx as nx
 import matplotlib.pyplot as plt
 from rich.console import Console
 
-from kmeans import (
+from updated_kmeans import (
     kmeans_clustering,
     clusters_to_nx_graph,
     read_distance_data,
