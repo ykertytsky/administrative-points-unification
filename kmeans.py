@@ -148,16 +148,10 @@ def clusters_to_nx_graph(city_clusters, cities, distances):
     # Adding Edges
     for i, city1 in enumerate(cities):
         for j, city2 in enumerate(cities):
-<<<<<<< HEAD
             if (
                 city_clusters.get(city1) == city_clusters.get(city2) and i != j
             ):  # Only for cities in the same cluster
                 weight = distances[i, j]
                 G.add_edge(city1, city2, weight=weight)
-=======
-            # if city_clusters.get(city1) == city_clusters.get(city2) and i != j:  # Only for cities in the same cluster
-            weight = distances[i, j]
-            G.add_edge(city1, city2, weight=weight)
->>>>>>> c2108bd (add md file for the louvian algorithm)
 
     return G

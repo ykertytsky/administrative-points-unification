@@ -156,13 +156,8 @@ def main():
         
         console.print("Community detection and visualization complete!", style="bold green")
     except Exception as e:
-<<<<<<< HEAD
         console.print(f"Error: {e}", style="bold red")
         sys.exit(1)
-=======
-        console.print(f"[bold red]Error: {e}[/bold red]")
-        sys.exit()
->>>>>>> c2108bd (add md file for the louvian algorithm)
 
 
 
