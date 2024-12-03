@@ -5,14 +5,106 @@ import matplotlib.pyplot as plt
 
 import pandas as pd
 
+def read_distance_data(file_path: str):
+    """
+    Read CSV file with city distance data
+    
+    Args:
+        file_path (str): Path to the CSV file
+    
+    Returns:
+        pd.DataFrame: Processed distance data
 
+    >>> import tempfile
+        >>> import pandas as pd
+        >>> data = '''Назва міста1,Назва міста2,Відстань (км)
+        ... Львів,Київ,540
+        ... Харків,Одеса,700
+        ... Київ,Одеса,480'''
+        >>> with tempfile.NamedTemporaryFile(mode='w+', suffix='.csv', delete=False) as tmp:
+        ...     _ = tmp.write(data)
+        ...     file_path = tmp.name
+        >>> df = read_distance_data(file_path)
+        >>> print(df)
+           Point1 Point2  distance
+        0   Львів   Київ       540
+        1  Харків  Одеса       700
+        2    Київ  Одеса       480
+    """
+    try:
+        # Read CSV file
+        data = pd.read_csv(file_path, encoding='utf-8')
+        
+        # Rename columns to standard format
+        data.rename(
+            columns={
+                "Назва міста1": "Point1", 
+                "Назва міста2": "Point2", 
+                "Відстань (км)": "distance"
+            },
+            inplace=True
+        )
+        
+        # Validate data
+        required_columns = ['Point1', 'Point2', 'distance']
+        if not all(col in data.columns for col in required_columns):
+            raise ValueError(f"Missing required columns. Need: {required_columns}")
+        
+        return data
+    
+    except Exception as e:
+        print(f"Error reading CSV file: {e}")
+        raise
 
-
+def create_graph_from_csv(file_path: str):
+    """
+    Create NetworkX graph from CSV distance data
+    
+    Args:
+        file_path (str): Path to the CSV file
+    
+    Returns:
+        nx.Graph: Graph with cities as nodes and distances as edge weights
+    >>> import tempfile
+    >>> import networkx as nx
+    >>> data = '''Назва міста1,Назва міста2,Відстань (км)
+    ... Львів,Київ,540
+    ... Харків,Одеса,700
+    ... Київ,Одеса,480'''
+    >>> with tempfile.NamedTemporaryFile(mode='w+', suffix='.csv', delete=False) as tmp:
+    ...     _ = tmp.write(data)
+    ...     file_path = tmp.name
+    >>> G = create_graph_from_csv(file_path)
+    >>> sorted(G.nodes())
+    ['Київ', 'Львів', 'Одеса', 'Харків']
+    >>> G['Львів']['Київ']['weight']
+    540
+    >>> G['Київ']['Одеса']['weight']
+    480
+    """
+    # Read distance data
+    data = read_distance_data(file_path)
+    
+    # Create graph
+    G = nx.Graph()
+    for _, row in data.iterrows():
+        G.add_edge(row["Point1"], row["Point2"], weight=row["distance"])
+    
+    return G
 
 
 def create_graph_dict(graph):
     """
     Convert NetworkX graph to adjacency dictionary with edge weights
+    >>> G = nx.Graph()
+    >>> G.add_edge("A", "B", weight=3)
+    >>> G.add_edge("A", "C", weight=2)
+    >>> G.add_edge("B", "C", weight=1)
+    >>> graph_dict = create_graph_dict(G)
+    >>> print(graph_dict)  # doctest: +NORMALIZE_WHITESPACE
+    {'A': {'B': 3, 'C': 2},
+        'B': {'A': 3, 'C': 1},
+        'C': {'A': 2, 'B': 1}}
     """
     graph_dict = {}
     for node in graph.nodes():
@@ -22,23 +114,49 @@ def create_graph_dict(graph):
         }
     return graph_dict
 
-def calculate_total_weight(graph_dict):
+def calculate_total_weight(graph_dict: dict) -> float:
     """
     Calculate total weight of the graph
+
+    >>> graph_dict = {'A': {'B': 3, 'C': 2},
+    ...               'B': {'A': 3, 'C': 1},
+    ...               'C': {'A': 2, 'B': 1}}
+    >>> calculate_total_weight(graph_dict)
+    6.0
     """
     return sum(sum(neighbors.values()) for neighbors in graph_dict.values()) / 2
 
 
-def calculate_node_degree(graph_dict):
+def calculate_node_degree(graph_dict: dict) -> float:
     """
     Calculate degree (weighted) for each node
+    >>> graph_dict = {'A': {'B': 3, 'C': 2},
+    ...               'B': {'A': 3, 'C': 1},
+    ...               'C': {'A': 2, 'B': 1}}
+    >>> calculate_node_degree(graph_dict)
+    {'A': 5, 'B': 4, 'C': 3}
     """
     return {node: sum(neighbors.values()) for node, neighbors in graph_dict.items()}
 
 
-def modularity_gain(graph_dict, total_weight, node, community, node_communities):
+def modularity_gain(graph_dict: dict, total_weight: float, node: float, community: 'str', node_communities: dict) -> float:
     """
     Calculate modularity gain when moving a node to a community
+    >>> graph_dict = {
+    ...     'A': {'B': 3, 'C': 2},
+    ...     'B': {'A': 3, 'C': 4, 'D': 1},
+    ...     'C': {'A': 2, 'B': 4},
+    ...     'D': {'B': 1}
+    ... }
+    >>> total_weight = 10.0
+    >>> node = 'A'
+    >>> test_community = 'community2'
+    >>> node_communities = {
+    ...     'community1': {'C', 'B'},
+    ...     'community2': {'D'}
+    ... }
+    >>> modularity_gain(graph_dict, total_weight, node, test_community, node_communities)
+    -0.025
     """
     node_degree = sum(graph_dict[node].values())
     community_internal_weight = sum(
@@ -60,6 +178,15 @@ def modularity_gain(graph_dict, total_weight, node, community, node_communities)
 def louvain_community_detection(graph):
     """
     Implement Louvain community detection algorithm
+    >>> G = nx.Graph()
+    >>> G.add_edge("A", "B", weight=1)
+    >>> G.add_edge("B", "C", weight=1)
+    >>> G.add_edge("C", "D", weight=1)
+    >>> G.add_edge("D", "A", weight=1)
+    >>> G.add_edge("A", "C", weight=1)
+    >>> communities = louvain_community_detection(G)
+    >>> sorted([sorted(list(c)) for c in communities])
+    [['A'], ['B'], ['C'], ['D']]
     """
     import random
     # Convert graph to dictionary representation
@@ -170,6 +297,13 @@ def communities_to_dict(communities):
 
     Returns:
         dict: Mapping of re-indexed community IDs to lists of nodes, excluding empty communities
+    >>> communities = {
+    ...     'community1': {'A', 'B'},
+    ...     'community2': {'C', 'D'},
+    ...     'community3': set()
+    ... }
+    >>> communities_to_dict(communities) == {0: {'A', 'B'}, 1: {'D', 'C'}}
+    True
     """
     # Filter out empty communities and create a new list
     non_empty_communities = [community for community in communities.values() if community]
@@ -182,4 +316,11 @@ def communities_to_dict(communities):
 
 
 
+# if __name__ == "__main__":
+#     G = create_graph_from_csv("data.csv")
+#     louvian_visualize_communities(G, louvain_community_detection(G))
 
+
+if __name__ == "__main__":
+    import doctest
+    print(doctest.testmod())
