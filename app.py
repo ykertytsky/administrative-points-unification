@@ -1,58 +1,77 @@
 import argparse
 import sys
-import warnings
 import networkx as nx
 import matplotlib.pyplot as plt
-from rich.console import Console
 
-import random
+import pandas as pd
 
-from kmeans import (
-    kmeans_clustering,
-    clusters_to_nx_graph,
-    read_distance_data,
-    create_distance_matrix,
+
+from updated_kmeans import (
+    balanced_kmeans,
+    kmeans_visualization
 )
 
 from louvian_algo import (
     louvain_community_detection,
-    communities_to_dict,
     louvian_visualize_communities,
-    create_graph_from_csv
+    communities_to_dict
 )
 
-def visualize_communities(graph, communities):
+def read_distance_data(file_path):
     """
-    Visualize graph with community coloring
+    Read CSV file with city distance data
+    
+    Args:
+        file_path (str): Path to the CSV file
+    
+    Returns:
+        pd.DataFrame: Processed distance data
     """
-    # Create a dictionary that maps each node to its community
-    node_community_map = {}
-    for community_id, community in enumerate(communities):
-        for node in community:
-            node_community_map[node] = community_id
+    try:
+        # Read CSV file
+        data = pd.read_csv(file_path, encoding='utf-8')
+        
+        # Rename columns to standard format
+        data.rename(
+            columns={
+                "Назва міста1": "Point1", 
+                "Назва міста2": "Point2", 
+                "Відстань (км)": "distance"
+            },
+            inplace=True
+        )
+        
+        required_columns = ['Point1', 'Point2', 'distance']
+        if not all(col in data.columns for col in required_columns):
+            raise ValueError(f"Missing required columns. Need: {required_columns}")
+        
+        return data
+    
+    except Exception as e:
+        print(f"Error reading CSV file: {e}")
+        raise
+def create_graph_from_csv(file_path):
+    """
+    Create NetworkX graph from CSV distance data
+    
+    Args:
+        file_path (str): Path to the CSV file
+    
+    Returns:
+        nx.Graph: Graph with cities as nodes and distances as edge weights
+    """
+    # Read distance data
+    data = read_distance_data(file_path)
+    
+    # Create graph
+    G = nx.Graph()
+    for _, row in data.iterrows():
+        G.add_edge(row["Point1"], row["Point2"], weight=row["distance"])
+    
+    return G
 
-    # Generate a list of colors corresponding to each community
-    colors = [node_community_map[node] for node in graph.nodes()]
 
-    # Graph Layout creation
-    pos = nx.spring_layout(graph, seed=42)
 
-    # Graph Visualization
-    plt.figure(figsize=(12, 8))
-    nx.draw_networkx(
-        graph,
-        pos,
-        node_color=colors,
-        cmap=plt.colormaps["tab20"],  # Different Colors from tab20 table
-        with_labels=True,
-        node_size=500,
-        font_size=10,
-        edge_color="gray",
-        width=0.5,
-    )
-
-    plt.title("K-means Visualization")
-    plt.show()
 
 def print_clusters_visual(clusters):
     """
@@ -80,84 +99,56 @@ def create_graph(data):
 
 
 def main():
-    """
-    Main Function with argparse active
-    """
-    warnings.filterwarnings("ignore")
-    console = Console()
-
-    parser = argparse.ArgumentParser(
-        description="Graph Clustering and Visualization"
-    )
-
-    # Required argument
+    parser = argparse.ArgumentParser(description="Process a file with optional features for visualization and clustering.")
+    
+    # Required flag for the path to the file
     parser.add_argument(
-        "file_path",
+        "--path",
+        required=True,
         type=str,
-        help="Path to the CSV data file containing city distances",
+        help="Path to the file to be processed"
     )
+
+
     parser.add_argument(
         "--visual",
-        type=bool,
-        default=False,
-        help="Visualize algorithm. False by default",
+        action="store_true",
+        help="Enable visualization"
     )
 
-    # Optional arguments
     parser.add_argument(
         "--kmeans",
-        action="store_true",  # This makes --kmeans a boolean flag
-        help="Use k-means clustering algorithm (default is Louvain)",
-    )
-    parser.add_argument(
-        "--num_clusters",
         type=int,
-        default=3,
-        help="Number of clusters for k-means (default is 3)",
+        metavar="NUM_CLUSTERS",
+        help="Use the k-means algorithm with the specified number of clusters"
     )
 
-    # Parse arguments
     args = parser.parse_args()
 
-    console.print(
-        "Starting graph clustering...", style="bold green"
-    )
-    try:
-        console.print(f"Reading data from: {args.file_path}", style="bold blue")
-        data = read_distance_data(args.file_path)
-        graph = create_graph(data)
-        
-        if args.kmeans:  # Check if --kmeans flag is provided
-            from updated_kmeans import balanced_kmeans, visualize_clusters
-            console.print("Performing balanced k-means clustering...", style="bold yellow")
-            
-            clusters = balanced_kmeans(graph, args.num_clusters)
+    print(f"File path: {args.path}")
 
-            # Only visualize if --visual flag is explicitly True
-            if args.visual:
-                console.print("Visualizing clusters...", style="bold magenta")
-                visualize_clusters(graph, clusters)
-            else:
-                console.print("Showing cluster distribution (non-visual)", style="bold magenta")
-                print_clusters_visual(clusters)
-
+    if args.kmeans is not None:
+        print(f"K-means enabled with {args.kmeans} clusters.")
+        G = create_graph_from_csv("data.csv")
+        if args.visual:
+            clusters = balanced_kmeans(G, args.kmeans)
+            communities = list(clusters.values())
+            kmeans_visualization(G, communities)
         else:
-            console.print("Performing Louvain community detection...", style="bold yellow")
-            communities = louvain_community_detection(graph)
-            
-            if args.visual:
-                console.print("Visualizing communities...", style="bold magenta")
-                G = create_graph_from_csv("data.csv")
-                louvian_visualize_communities(G, louvain_community_detection(G))
-            else:
-                console.print("Showing community distribution", style="bold magenta")
-                communities = communities_to_dict(communities)
-                print_clusters_visual(communities)
+            print_clusters_visual(communities_to_dict(balanced_kmeans(G, args.kmeans)))
         
-        console.print("Community detection and visualization complete!", style="bold green")
-    except Exception as e:
-        console.print(f"Error: {e}", style="bold red")
-        sys.exit(1)
+    else:
+        print("Using Louvian algorithm for community detection.")
+        G = create_graph_from_csv("data.csv")
+        if args.visual:
+            louvian_visualize_communities(G, louvain_community_detection(G))
+        else:
+            print_clusters_visual(communities_to_dict(louvain_community_detection(G)))
+
+    if args.visual:
+        print("Visualization enabled.")
+
+
 
 
 

@@ -5,6 +5,34 @@ import matplotlib.pyplot as plt
 
 
 def balanced_kmeans(graph, k):
+    """
+    Balanced K-Means clustering algorithm for NetworkX graphs.
+
+    This algorithm extends the traditional K-Means algorithm to ensure that the
+    number of nodes in each cluster is roughly equal. It does this by initially
+    assigning nodes to the nearest centroid and then reassigning nodes to other
+    clusters if the initial assignment results in uneven cluster sizes.
+
+    Parameters
+    ----------
+    graph : NetworkX graph
+        The graph to be clustered.
+    k : int
+        The number of clusters to form.
+
+    Returns
+    -------
+    clusters : dict
+        A dictionary where the keys are the cluster IDs and the values are lists
+        of nodes in that cluster.
+
+    Notes
+    -----
+    The algorithm iterates until either the maximum number of iterations is
+    reached or the centroids do not change between iterations. If the maximum
+    number of iterations is reached, a warning message is printed to indicate
+    that the clustering may not have converged.
+    """
     nodes = list(graph.nodes)
     np.random.seed(42)
     centroids = np.random.choice(nodes, size=k, replace=False)
@@ -58,43 +86,52 @@ def balanced_kmeans(graph, k):
 
 
 
-# Visualize the results
-def visualize_clusters(graph, clusters, title="Balanced K-Means Clustering"):
+
+def kmeans_visualization(graph, communities):
+    """
+    Visualize a graph with community coloring.
+
+    Args:
+        graph (nx.Graph): The graph to be visualized.
+        communities (list): A list of lists, where each sublist contains nodes
+            belonging to the same community.
+
+    Notes:
+        The graph is visualized with a spring layout and each community is
+        assigned a color from the "tab20" colormap.
+    """
+    # Map nodes to their community ID
+    node_community_map = {}
+    for community_id, community in enumerate(communities):
+        for node in community:
+            node_community_map[node] = community_id
+
+    # Identify unassigned nodes and assign them to a default community (-1)
+    unassigned_nodes = set(graph.nodes()) - set(node_community_map.keys())
+    if unassigned_nodes:
+        print(f"Warning: Unassigned nodes detected: {unassigned_nodes}")
+    for node in unassigned_nodes:
+        node_community_map[node] = -1  # Default community ID
+
+    # Assign colors based on community
+    colors = [node_community_map[node] for node in graph.nodes()]
+
+    # Graph layout creation
     pos = nx.spring_layout(graph, seed=42)
+
+    # Graph visualization
     plt.figure(figsize=(12, 8))
-    colors = plt.cm.get_cmap("tab10", len(clusters))
+    nx.draw_networkx(
+        graph,
+        pos,
+        node_color=colors,
+        cmap=plt.colormaps["tab20"],
+        with_labels=True,
+        node_size=500,
+        font_size=10,
+        edge_color="gray",
+        width=0.5,
+    )
 
-    for cluster_id, nodes in clusters.items():
-        nx.draw_networkx_nodes(
-            graph,
-            pos,
-            nodelist=nodes,
-            node_color=[colors(cluster_id)],
-            label=f"Cluster {cluster_id}",
-        )
-    nx.draw_networkx_edges(graph, pos, alpha=0.5)
-    nx.draw_networkx_labels(graph, pos, font_size=10)
-
-    plt.title(title)
-    plt.legend()
+    plt.title("K-means Visualization")
     plt.show()
-
-
-# Load your graph data from CSV
-data = pd.read_csv("data.csv")
-data.rename(
-    columns={"Назва міста1": "Point1", "Назва міста2": "Point2", "Відстань (км)": "distance"},
-    inplace=True,
-)
-
-# Create graph and add edges with weights
-G = nx.Graph()
-for _, row in data.iterrows():
-    G.add_edge(row["Point1"], row["Point2"], weight=row["distance"])
-
-# Run balanced k-means
-k = 3  # Number of clusters
-clusters = balanced_kmeans(G, k)
-
-# Visualize the balanced clusters
-visualize_clusters(G, clusters)

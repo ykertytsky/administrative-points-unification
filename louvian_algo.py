@@ -5,60 +5,9 @@ import matplotlib.pyplot as plt
 
 import pandas as pd
 
-def read_distance_data(file_path):
-    """
-    Read CSV file with city distance data
-    
-    Args:
-        file_path (str): Path to the CSV file
-    
-    Returns:
-        pd.DataFrame: Processed distance data
-    """
-    try:
-        # Read CSV file
-        data = pd.read_csv(file_path, encoding='utf-8')
-        
-        # Rename columns to standard format
-        data.rename(
-            columns={
-                "Назва міста1": "Point1", 
-                "Назва міста2": "Point2", 
-                "Відстань (км)": "distance"
-            },
-            inplace=True
-        )
-        
-        # Validate data
-        required_columns = ['Point1', 'Point2', 'distance']
-        if not all(col in data.columns for col in required_columns):
-            raise ValueError(f"Missing required columns. Need: {required_columns}")
-        
-        return data
-    
-    except Exception as e:
-        print(f"Error reading CSV file: {e}")
-        raise
 
-def create_graph_from_csv(file_path):
-    """
-    Create NetworkX graph from CSV distance data
-    
-    Args:
-        file_path (str): Path to the CSV file
-    
-    Returns:
-        nx.Graph: Graph with cities as nodes and distances as edge weights
-    """
-    # Read distance data
-    data = read_distance_data(file_path)
-    
-    # Create graph
-    G = nx.Graph()
-    for _, row in data.iterrows():
-        G.add_edge(row["Point1"], row["Point2"], weight=row["distance"])
-    
-    return G
+
+
 
 
 def create_graph_dict(graph):
@@ -233,6 +182,4 @@ def communities_to_dict(communities):
 
 
 
-if __name__ == "__main__":
-    G = create_graph_from_csv("data.csv")
-    louvian_visualize_communities(G, louvain_community_detection(G))
+
