@@ -266,7 +266,7 @@ def louvian_visualize_communities(graph, communities):
         colors.append(node_community_map.get(node, len(communities)))
 
     # Create a layout for the graph
-    pos = nx.spring_layout(graph, seed=42)
+    pos = nx.spring_layout(graph, seed=43)
 
     # Draw the graph with colored nodes
     plt.figure(figsize=(12, 8))
